@@ -1,36 +1,33 @@
-class EventHandler {
-    constructor() {
-        this.handlers = {};
+// @ts-check
+/**
+ * Handles user requests and responses.
+ * @param {Object} request - The incoming request object.
+ * @param {Object} response - The outgoing response object.
+ * @returns {void}
+ */
+function handleRequest(request, response) {
+    const { method, url } = request;
+    /**
+     * Logs the request method and URL.
+     * @returns {void}
+     */
+    function logRequest() {
+        console.log(`Request Method: ${method}, URL: ${url}`);
     }
+    logRequest();
 
-    on(event, handler) {
-        if (!this.handlers[event]) {
-            this.handlers[event] = [];
-        }
-        this.handlers[event].push(handler);
-    }
-
-    emit(event, ...args) {
-        if (this.handlers[event]) {
-            // Use forEach for better performance in large arrays
-            this.handlers[event].forEach(handler => handler(...args));
-        }
-    }
-
-    off(event, handler) {
-        if (!this.handlers[event]) return;
-        this.handlers[event] = this.handlers[event].filter(h => h !== handler);
+    switch (method) {
+        case 'GET':
+            response.writeHead(200, {'Content-Type': 'text/plain'});
+            response.end('GET request received');
+            break;
+        case 'POST':
+            response.writeHead(200, {'Content-Type': 'application/json'});
+            response.end(JSON.stringify({ message: 'POST request received' }));
+            break;
+        default:
+            response.writeHead(405, {'Content-Type': 'text/plain'});
+            response.end('Method Not Allowed');
+            break;
     }
 }
-
-const eventHandler = new EventHandler();
-
-// Example usage
-eventHandler.on('dataReceived', (data) => {
-    console.log('Data received:', data);
-});
-
-// Emit an event
-eventHandler.emit('dataReceived', { key: 'value' });
-
-export default eventHandler;
