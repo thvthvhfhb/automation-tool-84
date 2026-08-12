@@ -1,44 +1,28 @@
-// @ts-check
-
-/**
- * Capitalizes the first letter of a string.
- *
- * @param {string} str - The input string.
- * @returns {string} - The capitalized string.
- */
-function capitalizeFirstLetter(str) {
-    if (typeof str !== 'string') {
-        throw new TypeError('Expected a string');
-    }
-    return str.charAt(0).toUpperCase() + str.slice(1);
+function isValidInput(input) {
+    return typeof input === 'string' && input.trim() !== '';
 }
 
-/**
- * Generates a random integer between two values.
- *
- * @param {number} min - The minimum value.
- * @param {number} max - The maximum value.
- * @returns {number} - A random integer between min and max, inclusive.
- */
-function getRandomInt(min, max) {
-    if (typeof min !== 'number' || typeof max !== 'number') {
-        throw new TypeError('Expected both min and max to be numbers');
+function processInput(input) {
+    if (!isValidInput(input)) {
+        throw new Error('Invalid input: must be a non-empty string.');
     }
-    return Math.floor(Math.random() * (max - min + 1) + min);
+    return input.trim().toUpperCase();
 }
 
-/**
- * Checks if an array contains a specific value.
- *
- * @param {Array} array - The array to check.
- * @param {*} value - The value to search for.
- * @returns {boolean} - True if the value is found, otherwise false.
- */
-function arrayContains(array, value) {
-    if (!Array.isArray(array)) {
-        throw new TypeError('Expected the first argument to be an array');
+function mainProcessingLoop(inputs) {
+    let results = [];
+    for (let i = 0; i < inputs.length; i++) {
+        try {
+            const result = processInput(inputs[i]);
+            results.push(result);
+        } catch (error) {
+            console.error(`Error processing input at index ${i}: ${error.message}`);
+        }
     }
-    return array.indexOf(value) !== -1;
+    return results;
 }
 
-module.exports = { capitalizeFirstLetter, getRandomInt, arrayContains };
+// Example usage
+const userInputs = [' hello ', '', 'world', '   '];
+const processedResults = mainProcessingLoop(userInputs);
+console.log(processedResults);  // Output: ['HELLO', 'WORLD']
