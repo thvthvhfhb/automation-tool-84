@@ -1,28 +1,28 @@
-function isValidInput(input) {
-    return typeof input === 'string' && input.trim() !== '';
-}
-
-function processInput(input) {
-    if (!isValidInput(input)) {
-        throw new Error('Invalid input: must be a non-empty string.');
-    }
-    return input.trim().toUpperCase();
-}
-
-function mainProcessingLoop(inputs) {
-    let results = [];
-    for (let i = 0; i < inputs.length; i++) {
+// A simple retry mechanism for network requests
+async function retryRequest(fetchFunction, retries = 3, delay = 1000) {
+    for (let i = 0; i < retries; i++) {
         try {
-            const result = processInput(inputs[i]);
-            results.push(result);
+            return await fetchFunction();
         } catch (error) {
-            console.error(`Error processing input at index ${i}: ${error.message}`);
+            if (i < retries - 1) {
+                console.warn(`Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
+                await new Promise(res => setTimeout(res, delay));
+            } else {
+                throw new Error(`Request failed after ${retries} attempts: ${error.message}`);
+            }
         }
     }
-    return results;
 }
 
-// Example usage
-const userInputs = [' hello ', '', 'world', '   '];
-const processedResults = mainProcessingLoop(userInputs);
-console.log(processedResults);  // Output: ['HELLO', 'WORLD']
+// Example usage of retryRequest
+async function fetchData() {
+    return await retryRequest(async () => {
+        const response = await fetch('https://api.example.com/data');
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    });
+}
+
+export { retryRequest, fetchData };
