@@ -1,33 +1,17 @@
-// @ts-check
-/**
- * Handles user requests and responses.
- * @param {Object} request - The incoming request object.
- * @param {Object} response - The outgoing response object.
- * @returns {void}
- */
-function handleRequest(request, response) {
-    const { method, url } = request;
-    /**
-     * Logs the request method and URL.
-     * @returns {void}
-     */
-    function logRequest() {
-        console.log(`Request Method: ${method}, URL: ${url}`);
-    }
-    logRequest();
+const axios = require('axios');
 
-    switch (method) {
-        case 'GET':
-            response.writeHead(200, {'Content-Type': 'text/plain'});
-            response.end('GET request received');
-            break;
-        case 'POST':
-            response.writeHead(200, {'Content-Type': 'application/json'});
-            response.end(JSON.stringify({ message: 'POST request received' }));
-            break;
-        default:
-            response.writeHead(405, {'Content-Type': 'text/plain'});
-            response.end('Method Not Allowed');
-            break;
+async function fetchWithRetry(url, options = {}, retries = 3, delay = 1000) {
+    try {
+        const response = await axios(url, options);
+        return response.data;
+    } catch (error) {
+        if (retries > 0) {
+            console.warn(`Retrying... (${retries} attempts left)`);
+            await new Promise(res => setTimeout(res, delay));
+            return fetchWithRetry(url, options, retries - 1, delay);
+        }
+        throw new Error(`Request failed after ${3 - retries + 1} attempts: ${error.message}`);
     }
 }
+
+module.exports = { fetchWithRetry };
