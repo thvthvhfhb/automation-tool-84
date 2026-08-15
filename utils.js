@@ -1,21 +1,32 @@
-const axios = require('axios');
+function deepMerge(target, source) {
+    if (typeof target !== 'object' || target === null) return source;
+    if (Array.isArray(target)) return target.concat(source);
 
-const RETRY_LIMIT = 3;
-const RETRY_DELAY = 1000;
-
-const retryRequest = async (url, options = {}, attempt = 1) => {
-    try {
-        const response = await axios(url, options);
-        return response.data;
-    } catch (error) {
-        if (attempt <= RETRY_LIMIT) {
-            console.warn(`Retrying request to ${url}, attempt ${attempt}`);
-            await new Promise(res => setTimeout(res, RETRY_DELAY));
-            return retryRequest(url, options, attempt + 1);
+    Object.keys(source).forEach(key => {
+        if (source[key] instanceof Object) {
+            if (!target[key]) Object.assign(target, { [key]: {} });
+            deepMerge(target[key], source[key]);
         } else {
-            throw new Error(`Failed to fetch ${url} after ${attempt} attempts: ${error.message}`);
+            Object.assign(target, { [key]: source[key] });
         }
-    }
+    });
+    return target;
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 };
 
-module.exports = { retryRequest };
+function uniqueArray(arr) {
+    return [...new Set(arr)];
+}
+
+module.exports = { deepMerge, debounce, uniqueArray };
