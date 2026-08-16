@@ -1,32 +1,21 @@
-function deepMerge(target, source) {
-    if (typeof target !== 'object' || target === null) return source;
-    if (Array.isArray(target)) return target.concat(source);
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-    Object.keys(source).forEach(key => {
-        if (source[key] instanceof Object) {
-            if (!target[key]) Object.assign(target, { [key]: {} });
-            deepMerge(target[key], source[key]);
-        } else {
-            Object.assign(target, { [key]: source[key] });
+async function retryOperation(operation, retries = 3, delay = 1000) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+            return await operation();
+        } catch (error) {
+            if (attempt < retries - 1) {
+                console.warn(`Attempt ${attempt + 1} failed: ${error.message}. Retrying in ${delay}ms...`);
+                await sleep(delay);
+            } else {
+                console.error(`Operation failed after ${retries} attempts: ${error.message}`);
+                throw error;
+            }
         }
-    });
-    return target;
+    }
 }
 
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-};
-
-function uniqueArray(arr) {
-    return [...new Set(arr)];
-}
-
-module.exports = { deepMerge, debounce, uniqueArray };
+module.exports = { retryOperation };
