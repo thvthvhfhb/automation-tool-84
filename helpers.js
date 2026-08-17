@@ -1,28 +1,32 @@
-// A simple retry mechanism for network requests
-async function retryRequest(fetchFunction, retries = 3, delay = 1000) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            return await fetchFunction();
-        } catch (error) {
-            if (i < retries - 1) {
-                console.warn(`Attempt ${i + 1} failed. Retrying in ${delay}ms...`);
-                await new Promise(res => setTimeout(res, delay));
+function sanitizeInput(input) {
+    return input.replace(/<script.*?>.*?<\/script>/gi, '');
+}
+
+function debounce(func, delay) {
+    let timeoutId;
+    return function(...args) {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+
+function deepMerge(target, source) {
+    for (const key in source) {
+        if (source.hasOwnProperty(key)) {
+            if (typeof source[key] === 'object' && source[key] !== null) {
+                if (!target[key]) target[key] = {};
+                deepMerge(target[key], source[key]);
             } else {
-                throw new Error(`Request failed after ${retries} attempts: ${error.message}`);
+                target[key] = source[key];
             }
         }
     }
+    return target;
 }
 
-// Example usage of retryRequest
-async function fetchData() {
-    return await retryRequest(async () => {
-        const response = await fetch('https://api.example.com/data');
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    });
+function formatDate(date, formatStr) {
+    const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+    return new Intl.DateTimeFormat('en-US', options).format(date);
 }
 
-export { retryRequest, fetchData };
+module.exports = { sanitizeInput, debounce, deepMerge, formatDate };
