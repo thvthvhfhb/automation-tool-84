@@ -1,21 +1,25 @@
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+function validateInput(input) {
+    if (typeof input !== 'string') {
+        throw new Error('Input must be a string');
+    }
+    if (input.trim() === '') {
+        throw new Error('Input cannot be empty');
+    }
+    return true;
 }
 
-async function retryOperation(operation, retries = 3, delay = 1000) {
-    for (let attempt = 0; attempt < retries; attempt++) {
-        try {
-            return await operation();
-        } catch (error) {
-            if (attempt < retries - 1) {
-                console.warn(`Attempt ${attempt + 1} failed: ${error.message}. Retrying in ${delay}ms...`);
-                await sleep(delay);
-            } else {
-                console.error(`Operation failed after ${retries} attempts: ${error.message}`);
-                throw error;
-            }
-        }
+function processInputs(inputs) {
+    try {
+        inputs.forEach((input) => {
+            validateInput(input);
+            // Continue with processing if input is valid
+            console.log(`Processing: ${input}`);
+        });
+    } catch (error) {
+        console.error(`Error processing inputs: ${error.message}`);
     }
 }
 
-module.exports = { retryOperation };
+// Sample main processing loop 
+const inputs = ['validInput', '', 42];
+processInputs(inputs);
