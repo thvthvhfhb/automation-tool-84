@@ -1,32 +1,27 @@
-function sanitizeInput(input) {
-    return input.replace(/<script.*?>.*?<\/script>/gi, '');
+function retry(fn, retries = 3, delay = 1000) {
+    return new Promise((resolve, reject) => {
+        const attempt = (n) => {
+            fn()
+                .then(resolve)
+                .catch((error) => {
+                    if (n === 1) {
+                        reject(error);
+                        return;
+                    }
+                    setTimeout(() => attempt(n - 1), delay);
+                });
+        };
+        attempt(retries);
+    });
 }
 
-function debounce(func, delay) {
-    let timeoutId;
-    return function(...args) {
-        if (timeoutId) clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => func.apply(this, args), delay);
-    };
+async function fetchData(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Network response was not ok');
+    return response.json();
 }
 
-function deepMerge(target, source) {
-    for (const key in source) {
-        if (source.hasOwnProperty(key)) {
-            if (typeof source[key] === 'object' && source[key] !== null) {
-                if (!target[key]) target[key] = {};
-                deepMerge(target[key], source[key]);
-            } else {
-                target[key] = source[key];
-            }
-        }
-    }
-    return target;
-}
-
-function formatDate(date, formatStr) {
-    const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
-    return new Intl.DateTimeFormat('en-US', options).format(date);
-}
-
-module.exports = { sanitizeInput, debounce, deepMerge, formatDate };
+// Usage example
+retry(() => fetchData('https://api.example.com/data'))
+    .then(data => console.log(data))
+    .catch(error => console.error('Fetch failed after retries:', error));
