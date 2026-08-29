@@ -1,23 +1,43 @@
-const MAX_RETRIES = 5;
-const RETRY_DELAY = 1000;
+const defaultConfig = {
+  timeout: 30000,
+  retries: 3,
+  parallel: false,
+  outputFormat: 'csv',
+  threshold: 0.5
+};
 
-async function fetchWithRetry(url, options = {}, retries = MAX_RETRIES) {
-    try {
-        const response = await fetch(url, options);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return await response.json();
-    } catch (error) {
-        if (retries > 0) {
-            console.warn(`Attempt failed: ${error.message}. Retrying... (${MAX_RETRIES - retries + 1})`);
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-            return fetchWithRetry(url, options, retries - 1);
-        } else {
-            console.error(`Max retries reached. Last error: ${error.message}`);
-            throw error;
-        }
+const loadConfig = (userConfig = {}) => {
+  const keys = [...new Set(Object.keys(defaultConfig).concat(Object.keys(userConfig)))];
+  return keys.reduce((acc, key) => {
+    const defaultVal = defaultConfig[key];
+    const userVal = userConfig[key];
+    if (userVal !== undefined) {
+      acc[key] = userVal;
+    } else {
+      acc[key] = defaultVal;
     }
+    return acc;
+  }, {});
+};
+
+class Config {
+  constructor(overrides = {}) {
+    this.data = loadConfig(overrides);
+  }
+  get(key) {
+    return this.data[key];
+  }
+  getAll() {
+    return {...this.data};
+  }
 }
 
-export { fetchWithRetry };
+const userSettings = {
+  timeout: 10000,
+  parallel: true,
+  threshold: 0.8
+};
+
+const myConfig = new Config(userSettings);
+console.log(myConfig.get('timeout'));
+console.log(myConfig.getAll());
