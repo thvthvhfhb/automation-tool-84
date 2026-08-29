@@ -1,78 +1,73 @@
-const utils = {
-  deepClone: function(obj) {
-    if (obj === null || typeof obj !== 'object') return obj;
-    const root = Array.isArray(obj) ? [] : {};
-    const stack = [{src: obj, dest: root}];
-    while (stack.length > 0) {
-      const {src, dest} = stack.pop();
-      for (const key in src) {
-        if (Object.prototype.hasOwnProperty.call(src, key)) {
-          const val = src[key];
-          if (val !== null && typeof val === 'object') {
-            const newDest = Array.isArray(val) ? [] : {};
-            dest[key] = newDest;
-            stack.push({src: val, dest: newDest});
-          } else {
-            dest[key] = val;
-          }
+function isObject(item) {
+  return item && typeof item === 'object' && !Array.isArray(item);
+}
+function mergeDeep(target, source) {
+  const output = Object.assign({}, target);
+  if (isObject(target) && isObject(source)) {
+    Object.keys(source).forEach(key => {
+      if (isObject(source[key])) {
+        if (!(key in target)) {
+          Object.assign(output, { [key]: source[key] });
+        } else {
+          output[key] = mergeDeep(target[key], source[key]);
         }
-      }
-    }
-    return root;
-  },
-  mergeData: function(target, ...sources) {
-    let result = this.deepClone(target || {});
-    sources.forEach(source => {
-      if (!source || typeof source !== 'object') return;
-      const clonedSource = this.deepClone(source);
-      for (const key in clonedSource) {
-        if (Object.prototype.hasOwnProperty.call(clonedSource, key)) {
-          const val = clonedSource[key];
-          if (result[key] !== null && typeof result[key] === 'object' && !Array.isArray(result[key]) && val !== null && typeof val === 'object' && !Array.isArray(val)) {
-            result[key] = this.mergeData(result[key], val);
-          } else {
-            result[key] = val;
-          }
-        }
+      } else {
+        Object.assign(output, { [key]: source[key] });
       }
     });
-    return result;
-  },
-  cleanData: function(data) {
-    if (data === undefined || data === null) return data;
-    if (Array.isArray(data)) {
-      return data
-        .filter(item => item !== undefined && item !== null)
-        .map(item => this.cleanData(item));
-    }
-    if (typeof data === 'object') {
-      const cleaned = {};
-      for (const key in data) {
-        if (Object.prototype.hasOwnProperty.call(data, key)) {
-          const value = this.cleanData(data[key]);
-          if (value !== undefined && value !== null) {
-            cleaned[key] = value;
+  }
+  return output;
+}
+const dataHandler = {
+  create: (initial = {}) => {
+    let internalData = JSON.parse(JSON.stringify(initial));
+    const api = {
+      get: (path) => {
+        if (!path) return JSON.parse(JSON.stringify(internalData));
+        const keys = path.split('.');
+        return keys.reduce((obj, key) => (obj && obj[key] !== undefined ? obj[key] : undefined), internalData);
+      },
+      set: (path, value) => {
+        const keys = path.split('.');
+        let current = internalData;
+        for (let i = 0; i < keys.length - 1; i++) {
+          if (current[keys[i]] === undefined || typeof current[keys[i]] !== 'object') {
+            current[keys[i]] = {};
           }
+          current = current[keys[i]];
         }
+        current[keys[keys.length - 1]] = value;
+        return api;
+      },
+      merge: (newData) => {
+        internalData = mergeDeep(internalData, newData);
+        return api;
+      },
+      process: (fn) => {
+        const processRecursive = (obj) => {
+          if (Array.isArray(obj)) {
+            return obj.map(processRecursive);
+          }
+          if (isObject(obj)) {
+            const newObj = {};
+            Object.keys(obj).forEach(k => {
+              const recursed = processRecursive(obj[k]);
+              newObj[k] = (isObject(recursed) || Array.isArray(recursed)) ? recursed : fn(recursed, k);
+            });
+            return newObj;
+          }
+          return fn(obj);
+        };
+        internalData = processRecursive(internalData);
+        return api;
+      },
+      getData: () => JSON.parse(JSON.stringify(internalData)),
+      reset: (newInitial = {}) => {
+        internalData = JSON.parse(JSON.stringify(newInitial));
+        return api;
       }
-      return cleaned;
-    }
-    return data;
-  },
-  normalizeData: function(data) {
-    const cloned = this.deepClone(data);
-    if (Array.isArray(cloned)) {
-      return cloned.map(item => this.normalizeData(item));
-    }
-    if (typeof cloned === 'object' && cloned !== null) {
-      const normalized = {};
-      Object.keys(cloned).sort().forEach(key => {
-        normalized[key.toLowerCase()] = this.normalizeData(cloned[key]);
-      });
-      return normalized;
-    }
-    return cloned;
+    };
+    return api;
   }
 };
-
-module.exports = utils;
+module.exports = dataHandler;
