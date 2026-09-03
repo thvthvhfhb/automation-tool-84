@@ -1,45 +1,26 @@
 const fs = require('fs');
 const path = require('path');
 
-class Logger {
-    constructor(logDir, maxSize, maxFiles) {
-        this.logDir = logDir;
-        this.maxSize = maxSize;
-        this.maxFiles = maxFiles;
-        this.currentLogFile = path.join(logDir, `app.log`);
-        this.createLogDir();
-    }
+const LOG_DIR = './logs';
+const MAX_SIZE = 1024 * 1024 * 5;
 
-    createLogDir() {
-        if (!fs.existsSync(this.logDir)) {
-            fs.mkdirSync(this.logDir, { recursive: true });
-        }
-    }
+if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
 
-    log(message) {
-        const logMessage = `${new Date().toISOString()} - ${message}\n`;
-        fs.appendFileSync(this.currentLogFile, logMessage);
-        this.rotateLogs();
-    }
+const logger = (message) => {
+  const logFile = path.join(LOG_DIR, 'app.log');
+  const timestamp = new Date().toISOString();
+  const entry = `[${timestamp}] ${message}\n`;
 
-    rotateLogs() {
-        const stats = fs.statSync(this.currentLogFile);
-        if (stats.size > this.maxSize) {
-            const oldLogFile = `${this.currentLogFile}.${Date.now()}`;
-            fs.renameSync(this.currentLogFile, oldLogFile);
-            this.cleanOldLogs();
-        }
+  try {
+    const stats = fs.existsSync(logFile) ? fs.statSync(logFile) : { size: 0 };
+    if (stats.size > MAX_SIZE) {
+      const archive = path.join(LOG_DIR, `app-${Date.now()}.log`);
+      fs.renameSync(logFile, archive);
     }
+    fs.appendFileSync(logFile, entry);
+  } catch (err) {
+    process.stderr.write(`Logger failure: ${err.message}\n`);
+  }
+};
 
-    cleanOldLogs() {
-        const files = fs.readdirSync(this.logDir);
-        const logFiles = files.filter(file => file.endsWith('.log'));
-        if (logFiles.length > this.maxFiles) {
-            logFiles.sort();
-            const filesToDelete = logFiles.slice(0, logFiles.length - this.maxFiles);
-            filesToDelete.forEach(file => fs.unlinkSync(path.join(this.logDir, file)));
-        }
-    }
-}
-
-module.exports = Logger;
+module.exports = logger;
