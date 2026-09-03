@@ -1,45 +1,29 @@
-const automationCore = (() => {
-  let tasks = [];
-  let config = { retries: 3, timeout: 5000, delay: 100 };
-  const register = (name, action) => {
-    tasks.push({ name, action, tries: 0 });
-  };
-  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-  const run = async (task) => {
-    while (task.tries < config.retries) {
-      try {
-        const promise = task.action();
-        const result = await Promise.race([
-          promise,
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), config.timeout))
-        ]);
-        return { name: task.name, result };
-      } catch (e) {
-        task.tries++;
-        if (task.tries < config.retries) await delay(config.delay);
-      }
+const executeTask = async (task, retries = 3) => {
+  const results = { data: null, error: null, attempts: 0 };
+  
+  const safeExecutor = async (fn, attempt) => {
+    try {
+      return await fn();
+    } catch (e) {
+      if (attempt >= retries) throw e;
+      return safeExecutor(fn, attempt + 1);
     }
-    throw new Error(`failed: ${task.name}`);
   };
-  const execute = async () => {
-    const results = [];
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i];
-      try {
-        const res = await run(task);
-        results.push(res);
-      } catch (e) {
-        results.push({ name: task.name, error: e.message });
-      }
+
+  try {
+    results.data = await safeExecutor(task, 0);
+  } catch (e) {
+    results.error = e instanceof Error ? e.message : String(e);
+    results.code = e.code || 'UNHANDLED_EXCEPTION';
+    console.error(`[automation-tool-84] Fatal failure: ${results.error}`);
+  }
+
+  return new Proxy(results, {
+    get(target, prop) {
+      if (prop === 'success') return target.error === null;
+      return target[prop];
     }
-    return results;
-  };
-  const reset = () => { tasks = []; };
-  const updateConfig = (updates) => { config = { ...config, ...updates }; };
-  return { register, execute, reset, updateConfig };
-})();
-automationCore.register('init', () => Promise.resolve('initialized'));
-automationCore.register('process', () => new Promise(r => setTimeout(() => r('processed'), 10)));
-automationCore.register('cleanup', () => Promise.resolve('cleaned'));
-automationCore.updateConfig({ retries: 1 });
-automationCore.execute().then(console.log).catch(console.error);
+  });
+};
+
+export { executeTask };
