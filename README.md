@@ -1,46 +1,51 @@
 # automation-tool-84
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-automation-tool-84 is a Node.js command-line tool for running custom JavaScript automations. It helps developers execute repetitive tasks such as data processing, file management, and API interactions with minimal configuration.
+A robust Node.js automation framework designed to streamline repetitive task execution across local and remote environments. This tool provides a clean API for scheduling workflows and managing background processes with minimal configuration.
 
 ## Features
-- Define tasks using standard JavaScript with async support
-- Run scripts sequentially or in parallel from a single command
-- Built-in utilities for file operations and HTTP requests
-- Automatic logging with execution reports and error details
+
+*   **Task Scheduling:** Execute complex operations using a cron-like syntax or simple interval-based triggers.
+*   **Built-in Logger:** Integrated real-time monitoring with automated log rotation and customizable severity levels.
+*   **Parallel Execution:** Orchestrate multiple asynchronous tasks concurrently without blocking the main event loop.
+*   **Error Recovery:** Native support for retry logic with exponential backoff for network-dependent tasks.
 
 ## Installation
 
-```bash
-npm install -g automation-tool-84
-```
-
-For local setup:
+Ensure you have [Node.js](https://nodejs.org/) (v16+) installed. Run the following command in your terminal:
 
 ```bash
-git clone https://github.com/Developer/automation-tool-84.git
-cd automation-tool-84
-npm install
+npm install automation-tool-84
 ```
 
 ## Usage
 
-Create a file `task.js`:
+Create an `automate.js` file to define your task lifecycle:
 
-```js
-module.exports = async () => {
-  console.log('Starting automation...');
-  // Add your task logic here
-};
+```javascript
+const { AutomationEngine } = require('automation-tool-84');
+
+const engine = new AutomationEngine();
+
+engine.registerTask('cleanup-logs', async () => {
+  console.log('Cleaning up temporary files...');
+  // Add your logic here
+}, { interval: '0 0 * * *' });
+
+engine.start();
 ```
 
-Execute the script:
+To run your automation script:
 
 ```bash
-automation-tool-84 run task.js
+node automate.js
 ```
+
+## Contributing
+
+We welcome contributions! Please feel free to submit a Pull Request or open an issue for any bugs or feature requests.
 
 ## License
 
-MIT © Developer
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
