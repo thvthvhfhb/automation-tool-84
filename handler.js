@@ -1,60 +1,38 @@
-'use strict';
-class TaskHandler {
-  #tasks = [];
-  #processed = new Set();
+const memoize = (fn) => {
+  const cache = new Map();
+  return (...args) => {
+    const key = JSON.stringify(args);
+    if (!cache.has(key)) cache.set(key, fn(...args));
+    return cache.get(key);
+  };
+};
 
-  constructor() {}
+const pipe = (...fns) => (x) => fns.reduce((v, f) => f(v), x);
 
-  async registerTask(taskId, taskFn) {
-    if (typeof taskFn !== 'function') {
-      throw new Error('Task must be a function');
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const attempt = async (fn, retries = 3) => {
+  try {
+    return await fn();
+  } catch (err) {
+    if (retries > 0) {
+      await delay(500);
+      return attempt(fn, retries - 1);
     }
-
-    const task = {
-      id: taskId,
-      fn: taskFn.toString(),
-      status: 'registered',
-      created: Date.now()
-    };
-
-    this.#tasks.push(task);
-    return taskId;
+    throw err;
   }
+};
 
-  async executeAll() {
-    const results = [];
-    const currentTasks = [...this.#tasks];  
-    this.#tasks = [];
-
-    for (const task of currentTasks) {
-      if (this.#processed.has(task.id)) {
-        continue;
-      }
-
-      try {
-        const fn = new Function('return (' + task.fn + ')')();
-        const result = await Promise.resolve(fn());
-        results.push({ id: task.id, status: 'success', result });
-        this.#processed.add(task.id);
-      } catch (err) {
-        results.push({ id: task.id, status: 'error', error: err.message });
-      }
+const deepFreeze = (obj) => {
+  Object.freeze(obj);
+  Object.getOwnPropertyNames(obj).forEach((prop) => {
+    if (obj[prop] !== null && (typeof obj[prop] === 'object' || typeof obj[prop] === 'function') && !Object.isFrozen(obj[prop])) {
+      deepFreeze(obj[prop]);
     }
+  });
+  return obj;
+};
 
-    return results;
-  }
+const pick = (obj, keys) => keys.reduce((acc, k) => (k in obj ? { ...acc, [k]: obj[k] } : acc), {});
 
-  async cleanup() {
-    const cleaned = this.#processed.size;
-    this.#processed.clear();
-    this.#tasks = this.#tasks.filter(task => !this.#processed.has(task.id));
-    return cleaned;
-  }
-
-  getPendingTasks() {
-    return this.#tasks.map(task => task.id);
-  }
-
-}
-
-module.exports = TaskHandler;
+module.exports = { memoize, pipe, delay, attempt, deepFreeze, pick };
