@@ -1,26 +1,65 @@
-const fs = require('fs');
-const path = require('path');
+const FALLBACK_BUFFER = Symbol('fallback_buffer');
 
-const LOG_DIR = './logs';
-const MAX_SIZE = 1024 * 1024 * 5;
+class EdgeCaseLogger {
+  #buffer = [];
+  #maxSize = 50;
 
-if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
-
-const logger = (message) => {
-  const logFile = path.join(LOG_DIR, 'app.log');
-  const timestamp = new Date().toISOString();
-  const entry = `[${timestamp}] ${message}\n`;
-
-  try {
-    const stats = fs.existsSync(logFile) ? fs.statSync(logFile) : { size: 0 };
-    if (stats.size > MAX_SIZE) {
-      const archive = path.join(LOG_DIR, `app-${Date.now()}.log`);
-      fs.renameSync(logFile, archive);
-    }
-    fs.appendFileSync(logFile, entry);
-  } catch (err) {
-    process.stderr.write(`Logger failure: ${err.message}\n`);
+  constructor(options = {}) {
+    this.#maxSize = options.maxSize || 50;
+    this[FALLBACK_BUFFER] = [];
   }
-};
 
-module.exports = logger;
+  #sanitize(val, seen = new WeakSet()) {
+    if (val === null || val === undefined) return String(val);
+    if (typeof val === 'bigint') return `${val.toString()}n`;
+    if (typeof val === 'symbol') return val.toString();
+    if (typeof val === 'function') return `[Function: ${val.name || 'anonymous'}]`;
+    if (val instanceof Error) {
+      return {
+        name: val.name || 'Error',
+        message: val.message || 'Unknown error message',
+        stack: val.stack || 'No stack trace available'
+      };
+    }
+    if (typeof val === 'object') {
+      if (seen.has(val)) return '[Circular Reference]';
+      seen.add(val);
+      const cleanObj = Array.isArray(val) ? [] : {};
+      for (const key of Reflect.ownKeys(val)) {
+        try {
+          cleanObj[String(key)] = this.#sanitize(val[key], seen);
+        } catch (err) {
+          cleanObj[String(key)] = `[Unreadable Property: ${err.message}]`;
+        }
+      }
+      return cleanObj;
+    }
+    return val;
+  }
+
+  log(level = 'info', ...args) {
+    try {
+      const entry = {
+        timestamp: new Date().toISOString(),
+        level: String(level).toUpperCase(),
+        payload: args.map(arg => this.#sanitize(arg))
+      };
+      this.#buffer.push(entry);
+      if (this.#buffer.length > this.#maxSize) this.#buffer.shift();
+      return entry;
+    } catch (fatalErr) {
+      const recovery = {
+        timestamp: new Date().toISOString(),
+        error: fatalErr?.message || 'Fatal logger degradation'
+      };
+      this[FALLBACK_BUFFER].push(recovery);
+      return null;
+    }
+  }
+
+  getHistory() {
+    return [...this.#buffer];
+  }
+}
+
+module.exports = { EdgeCaseLogger };
