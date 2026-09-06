@@ -1,65 +1,28 @@
-const FALLBACK_BUFFER = Symbol('fallback_buffer');
+const fs = require('fs');
+const path = require('path');
 
-class EdgeCaseLogger {
-  #buffer = [];
-  #maxSize = 50;
+const LOG_DIR = path.join(__dirname, 'logs');
+if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
 
-  constructor(options = {}) {
-    this.#maxSize = options.maxSize || 50;
-    this[FALLBACK_BUFFER] = [];
-  }
+const colors = {
+  info: '\x1b[36m',
+  error: '\x1b[31m',
+  warn: '\x1b[33m',
+  reset: '\x1b[0m'
+};
 
-  #sanitize(val, seen = new WeakSet()) {
-    if (val === null || val === undefined) return String(val);
-    if (typeof val === 'bigint') return `${val.toString()}n`;
-    if (typeof val === 'symbol') return val.toString();
-    if (typeof val === 'function') return `[Function: ${val.name || 'anonymous'}]`;
-    if (val instanceof Error) {
-      return {
-        name: val.name || 'Error',
-        message: val.message || 'Unknown error message',
-        stack: val.stack || 'No stack trace available'
-      };
-    }
-    if (typeof val === 'object') {
-      if (seen.has(val)) return '[Circular Reference]';
-      seen.add(val);
-      const cleanObj = Array.isArray(val) ? [] : {};
-      for (const key of Reflect.ownKeys(val)) {
-        try {
-          cleanObj[String(key)] = this.#sanitize(val[key], seen);
-        } catch (err) {
-          cleanObj[String(key)] = `[Unreadable Property: ${err.message}]`;
-        }
-      }
-      return cleanObj;
-    }
-    return val;
-  }
+const Logger = {
+  log(level, message) {
+    const timestamp = new Date().toISOString();
+    const formatted = `[${timestamp}] [${level.toUpperCase()}]: ${message}`;
+    console.log(`${colors[level] || ''}${formatted}${colors.reset}`);
+    
+    const logFile = path.join(LOG_DIR, `${new Date().toLocaleDateString().replace(/\//g, '-')}.log`);
+    fs.appendFileSync(logFile, formatted + '\n');
+  },
+  info(msg) { this.log('info', msg); },
+  error(msg) { this.log('error', msg); },
+  warn(msg) { this.log('warn', msg); }
+};
 
-  log(level = 'info', ...args) {
-    try {
-      const entry = {
-        timestamp: new Date().toISOString(),
-        level: String(level).toUpperCase(),
-        payload: args.map(arg => this.#sanitize(arg))
-      };
-      this.#buffer.push(entry);
-      if (this.#buffer.length > this.#maxSize) this.#buffer.shift();
-      return entry;
-    } catch (fatalErr) {
-      const recovery = {
-        timestamp: new Date().toISOString(),
-        error: fatalErr?.message || 'Fatal logger degradation'
-      };
-      this[FALLBACK_BUFFER].push(recovery);
-      return null;
-    }
-  }
-
-  getHistory() {
-    return [...this.#buffer];
-  }
-}
-
-module.exports = { EdgeCaseLogger };
+module.exports = Logger;
