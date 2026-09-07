@@ -1,29 +1,35 @@
-const executeTask = async (task, retries = 3) => {
-  const results = { data: null, error: null, attempts: 0 };
-  
-  const safeExecutor = async (fn, attempt) => {
-    try {
-      return await fn();
-    } catch (e) {
-      if (attempt >= retries) throw e;
-      return safeExecutor(fn, attempt + 1);
-    }
-  };
+const schema = { id: 'number', label: 'string' };
 
-  try {
-    results.data = await safeExecutor(task, 0);
-  } catch (e) {
-    results.error = e instanceof Error ? e.message : String(e);
-    results.code = e.code || 'UNHANDLED_EXCEPTION';
-    console.error(`[automation-tool-84] Fatal failure: ${results.error}`);
-  }
-
-  return new Proxy(results, {
-    get(target, prop) {
-      if (prop === 'success') return target.error === null;
-      return target[prop];
-    }
-  });
+const validate = (data) => {
+  const keys = Object.keys(schema);
+  return keys.every(key => 
+    data.hasOwnProperty(key) && typeof data[key] === schema[key]
+  );
 };
 
-export { executeTask };
+async function processQueue(items) {
+  const pipeline = items.entries();
+  
+  for (const [index, item] of pipeline) {
+    try {
+      if (!validate(item)) {
+        throw new TypeError(`Malformed payload at index ${index}`);
+      }
+      
+      console.log(`Processing entity: ${item.id}`);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+    } catch (err) {
+      console.error(`Skipping item ${index}: ${err.message}`);
+      continue;
+    }
+  }
+}
+
+const inputData = [
+  { id: 1, label: 'alpha' },
+  { id: 'wrong', label: 'beta' },
+  { id: 3, label: 'gamma' }
+];
+
+processQueue(inputData);
