@@ -1,28 +1,29 @@
 const fs = require('fs');
-const path = require('path');
 
-const LOG_DIR = path.join(__dirname, 'logs');
-if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR);
-
-const colors = {
-  info: '\x1b[36m',
-  error: '\x1b[31m',
-  warn: '\x1b[33m',
-  reset: '\x1b[0m'
-};
-
-const Logger = {
-  log(level, message) {
-    const timestamp = new Date().toISOString();
-    const formatted = `[${timestamp}] [${level.toUpperCase()}]: ${message}`;
-    console.log(`${colors[level] || ''}${formatted}${colors.reset}`);
+const safeLog = (data, context = 'default') => {
+  try {
+    if (data === undefined || data === null) throw new Error('Void payload detected');
+    const serialized = JSON.stringify(data, (key, val) => typeof val === 'bigint' ? val.toString() : val);
+    const entry = `[${new Date().toISOString()}] [${context}] ${serialized}\n`;
     
-    const logFile = path.join(LOG_DIR, `${new Date().toLocaleDateString().replace(/\//g, '-')}.log`);
-    fs.appendFileSync(logFile, formatted + '\n');
-  },
-  info(msg) { this.log('info', msg); },
-  error(msg) { this.log('error', msg); },
-  warn(msg) { this.log('warn', msg); }
+    fs.appendFileSync('automation.log', entry);
+  } catch (err) {
+    const fallback = `[${new Date().toISOString()}] [CRITICAL] Handler failure: ${err.message}\n`;
+    process.stderr.write(fallback);
+    
+    if (err.code === 'ENOSPC') {
+      process.exit(1);
+    }
+  }
 };
 
-module.exports = Logger;
+const interceptErrors = (fn) => (...args) => {
+  try {
+    return fn(...args);
+  } catch (err) {
+    safeLog({ error: err.message, stack: err.stack }, 'INTERCEPTOR');
+    return null;
+  }
+};
+
+module.exports = { safeLog, interceptErrors };
