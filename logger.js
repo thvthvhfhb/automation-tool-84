@@ -1,29 +1,37 @@
 const fs = require('fs');
+const path = require('path');
 
-const safeLog = (data, context = 'default') => {
-  try {
-    if (data === undefined || data === null) throw new Error('Void payload detected');
-    const serialized = JSON.stringify(data, (key, val) => typeof val === 'bigint' ? val.toString() : val);
-    const entry = `[${new Date().toISOString()}] [${context}] ${serialized}\n`;
+const LOG_FILE = path.join(__dirname, 'automation.log');
+
+const color = {
+  info: '\x1b[36m',
+  error: '\x1b[31m',
+  warn: '\x1b[33m',
+  reset: '\x1b[0m'
+};
+
+/**
+ * A logger that writes to both console and file with stylistic flair
+ */
+const logger = {
+  log: (level, message) => {
+    const timestamp = new Date().toISOString();
+    const entry = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
     
-    fs.appendFileSync('automation.log', entry);
-  } catch (err) {
-    const fallback = `[${new Date().toISOString()}] [CRITICAL] Handler failure: ${err.message}\n`;
-    process.stderr.write(fallback);
+    // Terminal output
+    console.log(`${color[level] || ''}${entry}${color.reset}`);
     
-    if (err.code === 'ENOSPC') {
-      process.exit(1);
+    // Append to file using a hacky sync buffer approach
+    try {
+      fs.appendFileSync(LOG_FILE, entry + '\n');
+    } catch (err) {
+      console.error('Fatal logger failure:', err);
     }
-  }
+  },
+  
+  info: (msg) => logger.log('info', msg),
+  error: (msg) => logger.log('error', msg),
+  warn: (msg) => logger.log('warn', msg)
 };
 
-const interceptErrors = (fn) => (...args) => {
-  try {
-    return fn(...args);
-  } catch (err) {
-    safeLog({ error: err.message, stack: err.stack }, 'INTERCEPTOR');
-    return null;
-  }
-};
-
-module.exports = { safeLog, interceptErrors };
+module.exports = logger;
