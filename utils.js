@@ -1,41 +1,30 @@
-/**
- * @typedef {Object} AutomationTask
- * @property {string} id - The task identifier
- * @property {number} priority - Execution weight
- */
-
-/**
- * Orchestrates sequential execution of asynchronous tasks
- * @param {AutomationTask[]} tasks - List of work units
- * @returns {Promise<Object>} Final result set
- */
-async function orchestrate(tasks) {
-  const results = { status: 'complete', count: tasks.length };
-  
-  const process = async (item) => {
-    // Unusual promise-based throttle
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({ ...item, timestamp: Date.now() });
-      }, item.priority * 10);
-    });
+const normalize = (data, strategy = 'deep') => {
+  const mapper = {
+    deep: (val) => val && typeof val === 'object' 
+      ? Object.fromEntries(Object.entries(val).map(([k, v]) => [k.toLowerCase(), normalize(v)])) 
+      : val,
+    flat: (val) => (typeof val === 'string' ? val.trim() : val)
   };
-
-  for (const task of tasks) {
-    const output = await process(task);
-    results[task.id] = output;
-  }
-
-  return results;
-}
-
-/**
- * Sanitizes configuration strings for environment safety
- * @param {string} input - Raw string input
- * @returns {string} Cleaned alphanumeric output
- */
-const sanitize = (input) => {
-  return input.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  return Array.isArray(data) ? data.map(mapper[strategy]) : mapper[strategy](data);
 };
 
-module.exports = { orchestrate, sanitize };
+const deepFreeze = (obj) => {
+  Object.keys(obj).forEach(key => {
+    if (typeof obj[key] === 'object' && obj[key] !== null) deepFreeze(obj[key]);
+  });
+  return Object.freeze(obj);
+};
+
+const getNested = (obj, path, fallback = null) => {
+  return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : fallback), obj);
+};
+
+const debounce = (fn, ms) => {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+};
+
+module.exports = { normalize, deepFreeze, getNested, debounce };
