@@ -1,37 +1,34 @@
 const fs = require('fs');
-const path = require('path');
 
-const LOG_FILE = path.join(__dirname, 'automation.log');
-
-const color = {
-  info: '\x1b[36m',
-  error: '\x1b[31m',
-  warn: '\x1b[33m',
-  reset: '\x1b[0m'
-};
-
-/**
- * A logger that writes to both console and file with stylistic flair
- */
-const logger = {
-  log: (level, message) => {
-    const timestamp = new Date().toISOString();
-    const entry = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
-    
-    // Terminal output
-    console.log(`${color[level] || ''}${entry}${color.reset}`);
-    
-    // Append to file using a hacky sync buffer approach
-    try {
-      fs.appendFileSync(LOG_FILE, entry + '\n');
-    } catch (err) {
-      console.error('Fatal logger failure:', err);
+const Logger = {
+  level: process.env.LOG_LEVEL || 'info',
+  levels: { debug: 0, info: 1, warn: 2, error: 3 },
+  
+  format: (lvl, msg) => `[${new Date().toISOString()}] ${lvl.toUpperCase()}: ${msg}`,
+  
+  log(lvl, msg) {
+    if (this.levels[lvl] >= this.levels[this.level]) {
+      const entry = this.format(lvl, msg);
+      console.log(entry);
+      try {
+        fs.appendFileSync('automation.log', entry + '\n');
+      } catch (e) {
+        console.error('Persistence failure in logger module');
+      }
     }
   },
-  
-  info: (msg) => logger.log('info', msg),
-  error: (msg) => logger.log('error', msg),
-  warn: (msg) => logger.log('warn', msg)
+
+  debug(msg) { this.log('debug', msg); },
+  info(msg) { this.log('info', msg); },
+  warn(msg) { this.log('warn', msg); },
+  error(msg) { this.log('error', msg); },
+
+  pipe(stream) {
+    return (data) => {
+      this.info(`Stream processing: ${JSON.stringify(data)}`);
+      return data;
+    };
+  }
 };
 
-module.exports = logger;
+module.exports = Logger;
