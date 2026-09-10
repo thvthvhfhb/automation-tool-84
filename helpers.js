@@ -1,48 +1,31 @@
-/**
- * Defensive execution harness with automatic parameter recovery for edge cases
- */
-const bubbleWrap = (fn, fallbackValue = null) => {
-  const remedies = [
-    (args) => args.map(arg => typeof arg === 'string' && !isNaN(arg) && arg.trim() !== '' ? Number(arg) : arg),
-    (args) => args.map(arg => arg === undefined || arg === null ? {} : arg),
-    (args) => args.map(arg => typeof arg === 'object' && arg !== null ? Object.freeze({ ...arg }) : arg)
-  ];
+const fs = require('fs');
 
-  return (...args) => {
-    try {
-      return fn(...args);
-    } catch (initialError) {
-      for (const remedy of remedies) {
-        try {
-          const healedArgs = remedy(args);
-          if (JSON.stringify(healedArgs) !== JSON.stringify(args)) {
-            return fn(...healedArgs);
-          }
-        } catch {
-          // Ignore unsuccessful recovery mutations and try next
-        }
-      }
-
-      if (initialError instanceof TypeError && typeof fallbackValue === 'function') {
-        return fallbackValue(initialError, ...args);
-      }
-
-      if (fallbackValue !== null) {
-        return fallbackValue;
-      }
-
-      throw new Error(`Execution permanently halted: ${initialError.message}`, { cause: initialError });
+const mergeDeep = (target, source) => {
+  for (const key of Object.keys(source)) {
+    if (source[key] instanceof Object && key in target) {
+      Object.assign(source[key], mergeDeep(target[key], source[key]));
     }
-  };
+  }
+  Object.assign(target || {}, source);
+  return target;
 };
 
-const safeParseJSON = bubbleWrap((str) => JSON.parse(str), {});
-
-const safeSum = bubbleWrap((a, b) => {
-  if (typeof a !== 'number' || typeof b !== 'number') {
-    throw new TypeError('Math requires real numbers');
+const loadConfig = (path, defaults = {}) => {
+  let fileData = {};
+  try {
+    fileData = JSON.parse(fs.readFileSync(path, 'utf8'));
+  } catch (e) {
+    console.warn(`[automation-tool-84] config missing at ${path}, using defaults`);
   }
-  return a + b;
-}, 0);
+  
+  const proxyHandler = {
+    get: (target, prop) => {
+      if (prop in target) return target[prop];
+      return defaults[prop];
+    }
+  };
 
-module.exports = { bubbleWrap, safeParseJSON, safeSum };
+  return new Proxy(mergeDeep(defaults, fileData), proxyHandler);
+};
+
+module.exports = { loadConfig };
