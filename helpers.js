@@ -1,31 +1,32 @@
-const fs = require('fs');
+const retryNetworkOperation = async (operation, maxRetries = 3, delay = 1000) => {
+  let lastError;
 
-const mergeDeep = (target, source) => {
-  for (const key of Object.keys(source)) {
-    if (source[key] instanceof Object && key in target) {
-      Object.assign(source[key], mergeDeep(target[key], source[key]));
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt)));
+      }
     }
   }
-  Object.assign(target || {}, source);
-  return target;
+
+  throw lastError;
 };
 
-const loadConfig = (path, defaults = {}) => {
-  let fileData = {};
-  try {
-    fileData = JSON.parse(fs.readFileSync(path, 'utf8'));
-  } catch (e) {
-    console.warn(`[automation-tool-84] config missing at ${path}, using defaults`);
-  }
-  
-  const proxyHandler = {
-    get: (target, prop) => {
-      if (prop in target) return target[prop];
-      return defaults[prop];
+const withExponentialBackoff = (fn) => {
+  return (...args) => retryNetworkOperation(() => fn(...args));
+};
+
+const fetchWithRetry = async (url, options = {}, retries = 3) => {
+  return await retryNetworkOperation(async () => {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-  };
-
-  return new Proxy(mergeDeep(defaults, fileData), proxyHandler);
+    return response;
+  }, retries);
 };
 
-module.exports = { loadConfig };
+module.exports = { retryNetworkOperation, withExponentialBackoff, fetchWithRetry };
