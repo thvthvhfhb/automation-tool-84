@@ -1,30 +1,38 @@
-const normalize = (data, strategy = 'deep') => {
-  const mapper = {
-    deep: (val) => val && typeof val === 'object' 
-      ? Object.fromEntries(Object.entries(val).map(([k, v]) => [k.toLowerCase(), normalize(v)])) 
-      : val,
-    flat: (val) => (typeof val === 'string' ? val.trim() : val)
-  };
-  return Array.isArray(data) ? data.map(mapper[strategy]) : mapper[strategy](data);
-};
-
-const deepFreeze = (obj) => {
-  Object.keys(obj).forEach(key => {
-    if (typeof obj[key] === 'object' && obj[key] !== null) deepFreeze(obj[key]);
-  });
-  return Object.freeze(obj);
-};
-
-const getNested = (obj, path, fallback = null) => {
-  return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : fallback), obj);
-};
-
-const debounce = (fn, ms) => {
-  let timer;
+const memoize = (fn, ttl = 3600000) => {
+  const cache = new Map();
   return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), ms);
+    const key = JSON.stringify(args);
+    const now = Date.now();
+    if (cache.has(key)) {
+      const { val, expiry } = cache.get(key);
+      if (expiry > now) return val;
+    }
+    const result = fn(...args);
+    cache.set(key, { val: result, expiry: now + ttl });
+    return result;
   };
 };
 
-module.exports = { normalize, deepFreeze, getNested, debounce };
+const batchedProcess = (items, processor, batchSize = 10) => {
+  let index = 0;
+  const results = [];
+  const next = async () => {
+    if (index >= items.length) return results;
+    const chunk = items.slice(index, index + batchSize);
+    index += batchSize;
+    const batchResults = await Promise.all(chunk.map(processor));
+    results.push(...batchResults);
+    return next();
+  };
+  return next();
+};
+
+const debounceRaf = (fn) => {
+  let frame = null;
+  return (...args) => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => fn(...args));
+  };
+};
+
+module.exports = { memoize, batchedProcess, debounceRaf };
